@@ -11,15 +11,11 @@ import { ArticlePage } from '../pages/ArticlePage';
 
 test(
   'User can create, edit and delete an article',
-  async ({ page }) => {
-
+  async ({ page, apiClient }) => {
     const user = createTestUser();
     const article = createTestArticle();
 
-    // --------------------------------
     // REGISTER
-    // --------------------------------
-
     const registerPage = new RegisterPage(page);
 
     await registerPage.goto();
@@ -36,10 +32,15 @@ test(
       }).first()
     ).toBeVisible();
 
-    // --------------------------------
-    // CREATE ARTICLE
-    // --------------------------------
+    // Capture authenticated API token for final state verification.
+    const loginResponse = await apiClient.loginUser(
+      user.email,
+      user.password
+    );
 
+    const token = loginResponse.user.token;
+
+    // CREATE ARTICLE
     const editorPage = new EditorPage(page);
 
     await editorPage.goto();
@@ -52,20 +53,12 @@ test(
 
     await editorPage.publish();
 
-    // --------------------------------
     // VERIFY CREATED ARTICLE
-    // --------------------------------
-
     const articlePage = new ArticlePage(page);
 
-    await articlePage.verifyTitle(
-      article.title
-    );
+    await articlePage.verifyTitle(article.title);
 
-    // --------------------------------
     // EDIT ARTICLE
-    // --------------------------------
-
     await articlePage.clickEdit();
 
     await editorPage.updateArticle(
@@ -77,41 +70,36 @@ test(
     const updatedArticle =
       await editorPage.updateAndPublish();
 
-    // --------------------------------
-    // VERIFY API RESPONSE
-    // --------------------------------
-
     expect(updatedArticle.title).toBe(
       article.updatedTitle
     );
 
-    // --------------------------------
-    // OPEN UPDATED ARTICLE
-    // --------------------------------
-
+    // VERIFY UPDATED ARTICLE
     await articlePage.goto(
       updatedArticle.slug
     );
-
-    // --------------------------------
-    // VERIFY UPDATED ARTICLE
-    // --------------------------------
 
     await articlePage.verifyTitle(
       article.updatedTitle
     );
 
-    // --------------------------------
     // DELETE ARTICLE
-    // --------------------------------
-
     await articlePage.deleteArticle();
 
-    // Verify user remains logged in
+    // Verify user remains logged in.
     await expect(
       page.getByRole('link', {
         name: user.username,
       }).first()
     ).toBeVisible();
+
+    // Verify the deleted article no longer exists through the API.
+    const deletedArticleResponse =
+      await apiClient.getArticle(
+        token,
+        updatedArticle.slug
+      );
+
+    expect(deletedArticleResponse.status()).toBe(404);
   }
 );

@@ -34,14 +34,24 @@ export class ArticlePage {
     await expect(this.articleTitle).toHaveText(title);
   }
 
- async clickEdit() {
-  await Promise.all([
-    this.page.waitForURL(/\/editor/),
-    this.editButton.first().click(),
-  ]);
-}
+  async clickEdit() {
+    await Promise.all([
+      this.page.waitForURL(/\/editor/),
+      this.editButton.first().click(),
+    ]);
+  }
 
   async deleteArticle() {
+    const deleteResponsePromise = this.page.waitForResponse(
+      response =>
+        response.url().includes('/api/articles/') &&
+        response.request().method() === 'DELETE'
+    );
+
     await this.deleteButton.first().click();
+
+    const response = await deleteResponsePromise;
+
+    expect(response.status()).toBe(204);
   }
 }
